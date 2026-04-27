@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>cron-webhook</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f172a;
+      --surface:   #1e293b;
+      --border:    #334155;
+      --text:      #e2e8f0;
+      --muted:     #94a3b8;
+      --accent:    #38bdf8;
+    }
+
+    body {
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 1.25rem;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    header h1 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -.01em;
+    }
+    header h1 span { color: var(--muted); font-weight: 400; }
+
+    #live-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #64748b;
+      transition: background .3s;
+      flex-shrink: 0;
+    }
+    #live-dot.connected { background: #22c55e; box-shadow: 0 0 6px #22c55e88; }
+
+    #count {
+      background: #1d4ed8;
+      color: #bfdbfe;
+      font-size: .7rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+
+    header .spacer { flex: 1; }
+
+    .endpoint-hint {
+      font-size: .7rem;
+      color: var(--muted);
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-family: ui-monospace, monospace;
+    }
+
+    button {
+      cursor: pointer;
+      font-size: .75rem;
+      border: none;
+      border-radius: 6px;
+      padding: 4px 12px;
+      font-weight: 500;
+    }
+    #btn-clear {
+      background: #7f1d1d;
+      color: #fca5a5;
+    }
+    #btn-clear:hover { background: #991b1b; }
+
+    /* ── Layout ── */
+    .layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      height: calc(100vh - 52px);
+    }
+
+    /* ── Request list ── */
+    #list {
+      width: 380px;
+      flex-shrink: 0;
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+    }
+
+    .req-item {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      padding: .65rem 1rem;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background .1s;
+      user-select: none;
+    }
+    .req-item:hover   { background: #1e293b; }
+    .req-item.active  { background: #1e3a5f; }
+    .req-item.new-flash { animation: flash .5s ease; }
+
+    @keyframes flash {
+      0%   { background: #1e4060; }
+      100% { background: transparent; }
+    }
+
+    .method-badge {
+      font-size: .65rem;
+      font-weight: 700;
+      font-family: ui-monospace, monospace;
+      padding: 2px 6px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      min-width: 48px;
+      text-align: center;
+    }
+    .GET    { background: #14532d; color: #86efac; }
+    .POST   { background: #1e3a5f; color: #93c5fd; }
+    .PUT    { background: #451a03; color: #fed7aa; }
+    .PATCH  { background: #3b1f5e; color: #d8b4fe; }
+    .DELETE { background: #450a0a; color: #fca5a5; }
+    .HEAD, .OPTIONS, .OTHER { background: #1e293b; color: #94a3b8; }
+
+    .req-meta {
+      flex: 1;
+      min-width: 0;
+    }
+    .req-path {
+      font-size: .8rem;
+      font-family: ui-monospace, monospace;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .req-time {
+      font-size: .68rem;
+      color: var(--muted);
+      margin-top: 1px;
+    }
+
+    .status-code {
+      font-size: .7rem;
+      font-family: ui-monospace, monospace;
+      flex-shrink: 0;
+    }
+    .status-2xx { color: #4ade80; }
+    .status-3xx { color: #fbbf24; }
+    .status-4xx, .status-5xx { color: #f87171; }
+
+    .empty-state {
+      padding: 3rem 1.5rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: .85rem;
+      line-height: 1.7;
+    }
+    .empty-state code {
+      font-family: ui-monospace, monospace;
+      background: var(--surface);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: .8rem;
+    }
+
+    /* ── Detail panel ── */
+    #detail {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem;
+    }
+
+    .no-selection {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--muted);
+      font-size: .9rem;
+    }
+
+    .detail-header {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .detail-header .method-badge { font-size: .75rem; padding: 3px 10px; }
+    .detail-header .full-path {
+      font-family: ui-monospace, monospace;
+      font-size: .9rem;
+      color: var(--text);
+      word-break: break-all;
+    }
+    .detail-header .ts {
+      margin-left: auto;
+      font-size: .72rem;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+
+    .section {
+      margin-bottom: 1.25rem;
+    }
+    .section-title {
+      font-size: .7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--muted);
+      margin-bottom: .5rem;
+    }
+
+    .kv-table {
+      width: 100%;
+      font-size: .78rem;
+      font-family: ui-monospace, monospace;
+      border-collapse: collapse;
+    }
+    .kv-table tr { border-bottom: 1px solid var(--border); }
+    .kv-table tr:last-child { border-bottom: none; }
+    .kv-table td {
+      padding: .35rem .6rem;
+      vertical-align: top;
+      word-break: break-all;
+    }
+    .kv-table td:first-child {
+      color: var(--muted);
+      width: 35%;
+      padding-right: 1rem;
+    }
+
+    .code-block {
+      background: #0b1120;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: ui-monospace, monospace;
+      font-size: .78rem;
+      line-height: 1.6;
+      color: #a5f3fc;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div id="live-dot" title="Disconnected"></div>
+  <h1>cron-webhook <span>receiver</span></h1>
+  <span id="count">0</span>
+  <div class="spacer"></div>
+  <span class="endpoint-hint" id="base-url">http://localhost:4000/*</span>
+  <button id="btn-clear">Clear</button>
+</header>
+
+<div class="layout">
+  <div id="list">
+    <div class="empty-state" id="empty">
+      No requests yet.<br><br>
+      Point a CronPilot job at<br>
+      <code id="hint-url">http://cron-webhook:4000/ping</code>
+    </div>
+  </div>
+  <div id="detail">
+    <div class="no-selection" id="no-sel">Select a request to inspect</div>
+  </div>
+</div>
+
+<script>
+  const listEl   = document.getElementById('list');
+  const detailEl = document.getElementById('detail');
+  const countEl  = document.getElementById('count');
+  const dotEl    = document.getElementById('live-dot');
+  const emptyEl  = document.getElementById('empty');
+  const noSelEl  = document.getElementById('no-sel');
+  const baseUrl  = document.getElementById('base-url');
+  const hintUrl  = document.getElementById('hint-url');
+
+  const host = location.hostname + ':' + location.port;
+  baseUrl.textContent = `http://${host}/*`;
+  hintUrl.textContent = `http://${host}/ping`;
+
+  let requests = [];
+  let selectedId = null;
+
+  // ── SSE ──────────────────────────────────────────────────────────────────
+  function connect() {
+    const es = new EventSource('/__events');
+
+    es.onopen = () => {
+      dotEl.classList.add('connected');
+      dotEl.title = 'Live';
+    };
+
+    es.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'init') {
+        requests = msg.data;
+        renderList();
+      } else if (msg.type === 'request') {
+        requests.unshift(msg.data);
+        prependItem(msg.data);
+        updateCount();
+        if (selectedId === null) selectItem(msg.data.id);
+      } else if (msg.type === 'clear') {
+        requests = [];
+        renderList();
+        clearDetail();
+      }
+    };
+
+    es.onerror = () => {
+      dotEl.classList.remove('connected');
+      dotEl.title = 'Reconnecting…';
+      es.close();
+      setTimeout(connect, 2000);
+    };
+  }
+
+  connect();
+
+  // ── Render list ───────────────────────────────────────────────────────────
+  function methodClass(m) {
+    return ['GET','POST','PUT','PATCH','DELETE'].includes(m) ? m : 'OTHER';
+  }
+
+  function statusClass(s) {
+    if (s >= 500) return 'status-5xx';
+    if (s >= 400) return 'status-4xx';
+    if (s >= 300) return 'status-3xx';
+    return 'status-2xx';
+  }
+
+  function fmtTime(iso) {
+    const d = new Date(iso);
+    return d.toLocaleTimeString([], { hour12: false }) + '.' + String(d.getMilliseconds()).padStart(3,'0');
+  }
+
+  function makeItem(req) {
+    const el = document.createElement('div');
+    el.className = 'req-item';
+    el.dataset.id = req.id;
+    const pathStr = req.path + (Object.keys(req.query||{}).length
+      ? '?' + new URLSearchParams(req.query).toString() : '');
+    el.innerHTML = `
+      <span class="method-badge ${methodClass(req.method)}">${req.method}</span>
+      <div class="req-meta">
+        <div class="req-path" title="${pathStr}">${pathStr}</div>
+        <div class="req-time">${fmtTime(req.timestamp)}</div>
+      </div>
+      <span class="status-code ${statusClass(req.respondedWith)}">${req.respondedWith}</span>
+    `;
+    el.addEventListener('click', () => selectItem(req.id));
+    return el;
+  }
+
+  function renderList() {
+    listEl.innerHTML = '';
+    if (!requests.length) {
+      listEl.appendChild(emptyEl);
+      clearDetail();
+      return;
+    }
+    requests.forEach(r => listEl.appendChild(makeItem(r)));
+    updateCount();
+    if (selectedId) {
+      const el = listEl.querySelector(`[data-id="${selectedId}"]`);
+      if (el) el.classList.add('active');
+    }
+  }
+
+  function prependItem(req) {
+    if (listEl.contains(emptyEl)) listEl.removeChild(emptyEl);
+    const el = makeItem(req);
+    el.classList.add('new-flash');
+    listEl.prepend(el);
+    if (selectedId === req.id) el.classList.add('active');
+    // Cap DOM nodes
+    const items = listEl.querySelectorAll('.req-item');
+    if (items.length > 500) items[items.length - 1].remove();
+  }
+
+  function updateCount() {
+    countEl.textContent = requests.length;
+  }
+
+  // ── Detail panel ──────────────────────────────────────────────────────────
+  function selectItem(id) {
+    selectedId = id;
+    document.querySelectorAll('.req-item').forEach(el => {
+      el.classList.toggle('active', el.dataset.id === id);
+    });
+    const req = requests.find(r => r.id === id);
+    if (!req) return;
+    renderDetail(req);
+  }
+
+  function clearDetail() {
+    selectedId = null;
+    detailEl.innerHTML = '';
+    detailEl.appendChild(noSelEl);
+  }
+
+  function renderDetail(req) {
+    const pathStr = req.path + (Object.keys(req.query||{}).length
+      ? '?' + new URLSearchParams(req.query).toString() : '');
+
+    const headersHtml = Object.entries(req.headers || {})
+      .sort(([a],[b]) => a.localeCompare(b))
+      .map(([k,v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`)
+      .join('');
+
+    const queryHtml = Object.keys(req.query||{}).length
+      ? `<div class="section">
+           <div class="section-title">Query Parameters</div>
+           <table class="kv-table">${
+             Object.entries(req.query).map(([k,v]) =>
+               `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')
+           }</table>
+         </div>`
+      : '';
+
+    let bodyHtml = '';
+    if (req.body !== null && req.body !== undefined && req.body !== '') {
+      const bodyStr = typeof req.body === 'object'
+        ? JSON.stringify(req.body, null, 2)
+        : String(req.body);
+      bodyHtml = `<div class="section">
+        <div class="section-title">Body</div>
+        <div class="code-block">${esc(bodyStr)}</div>
+      </div>`;
+    }
+
+    detailEl.innerHTML = `
+      <div class="detail-header">
+        <span class="method-badge ${methodClass(req.method)}">${req.method}</span>
+        <span class="full-path">${esc(pathStr)}</span>
+        <span class="ts">${new Date(req.timestamp).toLocaleString()}</span>
+      </div>
+      ${queryHtml}
+      <div class="section">
+        <div class="section-title">Headers</div>
+        <table class="kv-table">${headersHtml}</table>
+      </div>
+      ${bodyHtml}
+    `;
+  }
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;');
+  }
+
+  // ── Clear button ──────────────────────────────────────────────────────────
+  document.getElementById('btn-clear').addEventListener('click', () => {
+    if (!requests.length) return;
+    fetch('/__history', { method: 'DELETE' });
+  });
+</script>
+</body>
+</html>
