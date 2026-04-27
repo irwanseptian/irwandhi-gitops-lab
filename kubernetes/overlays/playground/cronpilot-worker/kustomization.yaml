@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: cronpilot-worker
+
+resources:
+  - ../../../base
+  - namespace.yaml
+  - db-secret.yaml
+  - svc-postgres.yaml
+
+images:
+  - name: app
+    newName: cronpilot-worker
+    newTag: latest
+
+patches:
+  - path: deployment-patch.yaml
+  - target:
+      kind: Deployment
+      name: app
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: cronpilot-worker
+      - op: replace
+        path: /spec/selector/matchLabels/app
+        value: cronpilot-worker
+      - op: replace
+        path: /spec/template/metadata/labels/app
+        value: cronpilot-worker

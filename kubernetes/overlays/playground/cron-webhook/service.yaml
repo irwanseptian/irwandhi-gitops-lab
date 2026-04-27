@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cron-webhook
+spec:
+  selector:
+    app: cron-webhook
+  ports:
+    - port: 4000
+      targetPort: 4000

@@ -1,0 +1,18 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cronpilot-frontend
+  namespace: cronpilot-frontend
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: cronpilot.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cronpilot-frontend
+                port:
+                  number: 80

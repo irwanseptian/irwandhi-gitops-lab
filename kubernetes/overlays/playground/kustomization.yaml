@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - postgres
+  - cronpilot-api
+  - cronpilot-worker
+  - cronpilot-frontend
+  - cron-webhook
+
+# Pin image tags for this environment — override app defaults here
+images:
+  - name: cronpilot-api
+    newTag: latest
+  - name: cronpilot-worker
+    newTag: latest
+  - name: cronpilot-frontend
+    newTag: latest
+  - name: cron-webhook
+    newTag: latest
