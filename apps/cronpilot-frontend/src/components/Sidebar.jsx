@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, List, PlusCircle, Clock, Users, Briefcase, ShieldAlert } from 'lucide-react';
+import { LayoutDashboard, List, PlusCircle, Clock, Users, Briefcase, ShieldAlert, BarChart2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/jobs',      icon: List,            label: 'Jobs'      },
   { to: '/jobs/new',  icon: PlusCircle,      label: 'New Job'   },
+  { to: '/report',    icon: BarChart2,        label: 'Reports'   },
 ];
 
 const adminItems = [

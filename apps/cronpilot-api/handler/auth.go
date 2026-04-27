@@ -117,6 +117,57 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+	if err := decode(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+	if body.CurrentPassword == "" || body.NewPassword == "" {
+		writeError(w, http.StatusBadRequest, "current_password and new_password required")
+		return
+	}
+	if len(body.NewPassword) < 6 {
+		writeError(w, http.StatusBadRequest, "New password must be at least 6 characters")
+		return
+	}
+
+	userID := h.claims(r).UserID
+
+	var passwordHash string
+	if err := h.db.QueryRow(context.Background(),
+		`SELECT password_hash FROM users WHERE id = $1::uuid`, userID,
+	).Scan(&passwordHash); err != nil {
+		writeError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(body.CurrentPassword)); err != nil {
+		authLog("password_change.failed", map[string]string{"userId": userID, "reason": "wrong_current_password"})
+		writeError(w, http.StatusUnauthorized, "Current password is incorrect")
+		return
+	}
+
+	newHash, err := bcrypt.GenerateFromPassword([]byte(body.NewPassword), 10)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Internal server error")
+		return
+	}
+
+	if _, err := h.db.Exec(context.Background(),
+		`UPDATE users SET password_hash = $1 WHERE id = $2::uuid`, string(newHash), userID,
+	); err != nil {
+		writeError(w, http.StatusInternalServerError, "Internal server error")
+		return
+	}
+
+	authLog("password_change.success", map[string]string{"userId": userID})
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Password updated"})
+}
+
 func (h *Handler) signToken(userID, email, role string) (string, error) {
 	claims := middleware.Claims{
 		UserID: userID,

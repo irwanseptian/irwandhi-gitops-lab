@@ -12,7 +12,7 @@ const PRESETS  = [
   { label: 'Mon 9am',           value: '0 9 * * 1'    },
 ];
 
-export default function JobForm({ initial = {}, onSubmit, isLoading }) {
+export default function JobForm({ initial = {}, onSubmit, isLoading, onCancel }) {
   const navigate = useNavigate();
   const [form, setForm] = useState({
     name:            '',
@@ -144,7 +144,7 @@ export default function JobForm({ initial = {}, onSubmit, isLoading }) {
         </button>
         <button
           type="button"
-          onClick={() => navigate(-1)}
+          onClick={() => onCancel ? onCancel() : navigate(-1)}
           className="px-5 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 transition-colors"
         >
           Cancel

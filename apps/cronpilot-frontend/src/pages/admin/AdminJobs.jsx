@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Pause, Play, Trash2, Zap, ChevronDown } from 'lucide-react';
+import { Pause, Play, Trash2, Zap, ChevronDown, Pencil, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { getAllJobs, pauseJob, resumeJob, deleteJob, triggerJob } from '../../api/admin';
-import { getUsers } from '../../api/admin';
+import { getAllJobs, pauseJob, resumeJob, deleteJob, triggerJob, updateJob, getUsers } from '../../api/admin';
 import StatusBadge from '../../components/StatusBadge';
+import JobForm from '../../components/JobForm';
 
 export default function AdminJobs() {
   const qc = useQueryClient();
   const [filterUser, setFilterUser] = useState('');
+  const [editJob, setEditJob]       = useState(null); // job being edited
 
   const { data: jobs  = [], isLoading } = useQuery({ queryKey: ['admin-jobs'],  queryFn: () => getAllJobs().then(r => r.data) });
   const { data: users = [] }            = useQuery({ queryKey: ['admin-users'], queryFn: () => getUsers().then(r => r.data) });
@@ -19,8 +20,24 @@ export default function AdminJobs() {
   const resumeMut  = useMutation({ mutationFn: id => resumeJob(id),  onSuccess: invalidate });
   const deleteMut  = useMutation({ mutationFn: id => deleteJob(id),  onSuccess: invalidate });
   const triggerMut = useMutation({ mutationFn: id => triggerJob(id), onSuccess: invalidate });
+  const updateMut  = useMutation({
+    mutationFn: ({ id, data }) => updateJob(id, data),
+    onSuccess: () => { invalidate(); setEditJob(null); },
+  });
 
   const displayed = filterUser ? jobs.filter(j => j.user_id === filterUser) : jobs;
+
+  // Normalise job data for JobForm initial values
+  const toFormInitial = (job) => ({
+    name:            job.name            || '',
+    description:     job.description     || '',
+    cron_expression: job.cron_expression || '0 * * * *',
+    url:             job.url             || '',
+    method:          job.method          || 'GET',
+    body:            job.body            || '',
+    timezone:        job.timezone        || 'UTC',
+    timeout_seconds: job.timeout_seconds || 30,
+  });
 
   return (
     <div>
@@ -86,6 +103,11 @@ export default function AdminJobs() {
                         className="p-1.5 text-gray-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors" title="Trigger now">
                         <Zap size={14} />
                       </button>
+                      <button
+                        onClick={() => setEditJob(job)}
+                        className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Edit">
+                        <Pencil size={14} />
+                      </button>
                       {job.status === 'active' ? (
                         <button onClick={() => pauseMut.mutate(job.id)}
                           className="p-1.5 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors" title="Pause">
@@ -110,6 +132,44 @@ export default function AdminJobs() {
           </table>
         )}
       </div>
+
+      {/* Edit drawer */}
+      {editJob && (
+        <div className="fixed inset-0 z-40 flex">
+          {/* backdrop */}
+          <div className="flex-1 bg-black/40" onClick={() => setEditJob(null)} />
+
+          {/* panel */}
+          <div className="w-full max-w-xl bg-white shadow-xl flex flex-col overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Edit Job</h2>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Owner: <span className="font-mono">{editJob.owner_email || 'no owner'}</span>
+                </p>
+              </div>
+              <button onClick={() => setEditJob(null)} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 flex-1">
+              {updateMut.isError && (
+                <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  {updateMut.error?.response?.data?.error || 'Failed to update job'}
+                </div>
+              )}
+              <JobForm
+                key={editJob.id}
+                initial={toFormInitial(editJob)}
+                isLoading={updateMut.isPending}
+                onSubmit={(data) => updateMut.mutate({ id: editJob.id, data })}
+                onCancel={() => setEditJob(null)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -70,6 +70,13 @@ func main() {
 			r.Post("/jobs/{id}/resume", h.ResumeJob)
 			r.Post("/jobs/{id}/trigger", h.TriggerJob)
 
+			r.Put("/profile/password", h.ChangePassword)
+
+			r.Get("/report/summary",        h.ReportSummary)
+			r.Get("/report/timeline",       h.ReportTimeline)
+			r.Get("/report/jobs",           h.ReportJobs)
+			r.Get("/report/executions.csv", h.ReportCSV)
+
 			r.Get("/executions", h.ListExecutions)
 			r.Get("/executions/{id}", h.GetExecution)
 

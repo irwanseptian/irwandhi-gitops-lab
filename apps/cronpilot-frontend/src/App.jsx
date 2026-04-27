@@ -10,6 +10,8 @@ import Login       from './pages/Login';
 import Register    from './pages/Register';
 import AdminJobs   from './pages/admin/AdminJobs';
 import AdminUsers  from './pages/admin/AdminUsers';
+import Profile     from './pages/Profile';
+import Report      from './pages/Report';
 
 export default function App() {
   return (
@@ -26,6 +28,9 @@ export default function App() {
             <Route path="jobs/new"      element={<NewJob />} />
             <Route path="jobs/:id"      element={<JobDetail />} />
             <Route path="jobs/:id/edit" element={<EditJob />} />
+
+            <Route path="profile" element={<Profile />} />
+            <Route path="report"  element={<Report />} />
 
             <Route path="admin/jobs"  element={<AdminRoute><AdminJobs /></AdminRoute>} />
             <Route path="admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
