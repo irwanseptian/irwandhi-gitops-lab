@@ -1,1 +1,1 @@
-# gitops-playground
+# irwandhi-gitops-lab
