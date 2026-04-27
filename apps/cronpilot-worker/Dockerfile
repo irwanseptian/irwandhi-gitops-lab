@@ -1,6 +1,11 @@
-FROM node:20-alpine
+FROM golang:1.23-alpine AS builder
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY src/ ./src/
-CMD ["node", "src/index.js"]
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /worker .
+
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates tzdata
+COPY --from=builder /worker /worker
+CMD ["/worker"]
