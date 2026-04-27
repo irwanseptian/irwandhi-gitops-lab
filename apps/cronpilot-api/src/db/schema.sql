@@ -1,7 +1,18 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
+CREATE TABLE IF NOT EXISTS users (
+  id            UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  email         VARCHAR(255) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  role          VARCHAR(20)  NOT NULL DEFAULT 'user',
+  created_at    TIMESTAMP    DEFAULT NOW()
+);
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user';
+
 CREATE TABLE IF NOT EXISTS jobs (
   id               UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id          UUID         REFERENCES users(id) ON DELETE CASCADE,
   name             VARCHAR(255) NOT NULL,
   description      TEXT,
   cron_expression  VARCHAR(100) NOT NULL,
@@ -16,6 +27,9 @@ CREATE TABLE IF NOT EXISTS jobs (
   created_at       TIMESTAMP    DEFAULT NOW(),
   updated_at       TIMESTAMP    DEFAULT NOW()
 );
+
+-- migrate existing DBs that already have the jobs table without user_id
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id) ON DELETE CASCADE;
 
 CREATE TABLE IF NOT EXISTS executions (
   id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -33,3 +47,4 @@ CREATE TABLE IF NOT EXISTS executions (
 CREATE INDEX IF NOT EXISTS idx_executions_job_id    ON executions(job_id);
 CREATE INDEX IF NOT EXISTS idx_executions_started   ON executions(started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_jobs_status          ON jobs(status);
+CREATE INDEX IF NOT EXISTS idx_jobs_user_id         ON jobs(user_id);
