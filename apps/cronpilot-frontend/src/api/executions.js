@@ -6,4 +6,7 @@ export const getExecutions = (jobId, limit = 50) => {
   return client.get('/executions', { params }).then(r => r.data);
 };
 
+export const getRunningExecutions = () =>
+  client.get('/executions/running').then(r => r.data);
+
 export const getExecution = (id) => client.get(`/executions/${id}`).then(r => r.data);

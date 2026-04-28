@@ -18,17 +18,21 @@ CREATE TABLE IF NOT EXISTS jobs (
 );
 
 CREATE TABLE IF NOT EXISTS executions (
-  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  job_id          UUID        NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
-  status          VARCHAR(20) NOT NULL DEFAULT 'running',
-  triggered_by    VARCHAR(20) DEFAULT 'schedule',
-  started_at      TIMESTAMP   NOT NULL DEFAULT NOW(),
-  completed_at    TIMESTAMP,
-  duration_ms     INT,
-  response_status INT,
-  response_body   TEXT,
-  error_message   TEXT
+  id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  job_id           UUID        NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+  status           VARCHAR(20) NOT NULL DEFAULT 'running',
+  triggered_by     VARCHAR(20) DEFAULT 'schedule',
+  started_at       TIMESTAMP   NOT NULL DEFAULT NOW(),
+  completed_at     TIMESTAMP,
+  duration_ms      INT,
+  response_status  INT,
+  response_body    TEXT,
+  error_message    TEXT,
+  cancel_requested BOOLEAN     NOT NULL DEFAULT FALSE
 );
+
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS concurrency_policy VARCHAR(20) NOT NULL DEFAULT 'Allow';
+ALTER TABLE executions ADD COLUMN IF NOT EXISTS cancel_requested BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE INDEX IF NOT EXISTS idx_executions_job_id    ON executions(job_id);
 CREATE INDEX IF NOT EXISTS idx_executions_started   ON executions(started_at DESC);

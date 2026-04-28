@@ -90,6 +90,50 @@
     }
     #btn-clear:hover { background: #991b1b; }
 
+    /* ── Active slow jobs panel ── */
+    #slow-panel {
+      background: #0c1a30;
+      border-bottom: 1px solid #1e40af;
+      padding: .6rem 1.25rem;
+      display: none;
+      gap: .75rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    #slow-panel.visible { display: flex; }
+
+    .slow-label {
+      font-size: .7rem;
+      font-weight: 600;
+      color: #60a5fa;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      flex-shrink: 0;
+    }
+
+    .slow-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      background: #1e3a5f;
+      border: 1px solid #2563eb;
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: .72rem;
+      font-family: ui-monospace, monospace;
+      color: #93c5fd;
+    }
+    .slow-pill .spin {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border: 2px solid #3b82f6;
+      border-top-color: #93c5fd;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
     /* ── Layout ── */
     .layout {
       display: flex;
@@ -284,12 +328,20 @@
   <button id="btn-clear">Clear</button>
 </header>
 
+<!-- Active slow jobs banner -->
+<div id="slow-panel">
+  <span class="slow-label">⏳ Running</span>
+  <div id="slow-pills"></div>
+</div>
+
 <div class="layout">
   <div id="list">
     <div class="empty-state" id="empty">
       No requests yet.<br><br>
       Point a CronPilot job at<br>
-      <code id="hint-url">http://cron-webhook:4000/ping</code>
+      <code id="hint-url">http://cron-webhook:4000/ping</code><br><br>
+      For concurrency testing, use<br>
+      <code id="hint-slow">http://cron-webhook:4000/slow?delay=10</code>
     </div>
   </div>
   <div id="detail">
@@ -298,21 +350,64 @@
 </div>
 
 <script>
-  const listEl   = document.getElementById('list');
-  const detailEl = document.getElementById('detail');
-  const countEl  = document.getElementById('count');
-  const dotEl    = document.getElementById('live-dot');
-  const emptyEl  = document.getElementById('empty');
-  const noSelEl  = document.getElementById('no-sel');
-  const baseUrl  = document.getElementById('base-url');
-  const hintUrl  = document.getElementById('hint-url');
+  const listEl    = document.getElementById('list');
+  const detailEl  = document.getElementById('detail');
+  const countEl   = document.getElementById('count');
+  const dotEl     = document.getElementById('live-dot');
+  const emptyEl   = document.getElementById('empty');
+  const noSelEl   = document.getElementById('no-sel');
+  const baseUrl   = document.getElementById('base-url');
+  const hintUrl   = document.getElementById('hint-url');
+  const hintSlow  = document.getElementById('hint-slow');
+  const slowPanel = document.getElementById('slow-panel');
+  const slowPills = document.getElementById('slow-pills');
 
   const host = location.hostname + ':' + location.port;
   baseUrl.textContent = `http://${host}/*`;
   hintUrl.textContent = `http://${host}/ping`;
+  hintSlow.textContent = `http://${host}/slow?delay=10`;
 
-  let requests = [];
+  let requests   = [];
   let selectedId = null;
+
+  // ── Active slow jobs ──────────────────────────────────────────────────────
+  // Map of id → { delaySec, startedAt }
+  const activeSlows = new Map();
+
+  function updateSlowPanel() {
+    slowPills.innerHTML = '';
+    if (activeSlows.size === 0) {
+      slowPanel.classList.remove('visible');
+      return;
+    }
+    slowPanel.classList.add('visible');
+    for (const [id, entry] of activeSlows) {
+      const pill = document.createElement('span');
+      pill.className = 'slow-pill';
+      pill.dataset.id = id;
+      pill.innerHTML = `<span class="spin"></span><span class="slow-elapsed" data-started="${entry.startedAt}"></span>`;
+      slowPills.appendChild(pill);
+    }
+    refreshElapsed();
+  }
+
+  function refreshElapsed() {
+    const now = Date.now();
+    document.querySelectorAll('.slow-elapsed').forEach(el => {
+      const started = new Date(el.dataset.started).getTime();
+      const elapsed = Math.floor((now - started) / 1000);
+      const entry = [...activeSlows.values()].find(e => {
+        const pill = el.closest('.slow-pill');
+        return pill && pill.dataset.id && activeSlows.has(pill.dataset.id);
+      });
+      const id = el.closest('.slow-pill')?.dataset.id;
+      const e = id ? activeSlows.get(id) : null;
+      el.textContent = `${id ? id.slice(0,8) : '?'} — ${elapsed}s / ${e ? e.delaySec : '?'}s`;
+    });
+  }
+
+  // Update elapsed timers every second.
+  setInterval(refreshElapsed, 1000);
 
   // ── SSE ──────────────────────────────────────────────────────────────────
   function connect() {
@@ -325,18 +420,36 @@
 
     es.onmessage = (e) => {
       const msg = JSON.parse(e.data);
+
       if (msg.type === 'init') {
-        requests = msg.data;
+        requests = msg.data.requests || [];
+        // Restore active slow jobs.
+        activeSlows.clear();
+        for (const s of (msg.data.active_slows || [])) {
+          activeSlows.set(s.id, { delaySec: s.delay_sec, startedAt: s.started_at });
+        }
         renderList();
+        updateSlowPanel();
+
       } else if (msg.type === 'request') {
         requests.unshift(msg.data);
         prependItem(msg.data);
         updateCount();
         if (selectedId === null) selectItem(msg.data.id);
+
       } else if (msg.type === 'clear') {
         requests = [];
         renderList();
         clearDetail();
+
+      } else if (msg.type === 'slow_start') {
+        const d = msg.data;
+        activeSlows.set(d.id, { delaySec: d.delay_sec, startedAt: d.started_at });
+        updateSlowPanel();
+
+      } else if (msg.type === 'slow_end') {
+        activeSlows.delete(msg.data.id);
+        updateSlowPanel();
       }
     };
 
@@ -406,7 +519,6 @@
     el.classList.add('new-flash');
     listEl.prepend(el);
     if (selectedId === req.id) el.classList.add('active');
-    // Cap DOM nodes
     const items = listEl.querySelectorAll('.req-item');
     if (items.length > 500) items[items.length - 1].remove();
   }

@@ -63,6 +63,7 @@ type Job struct {
 	Status              string          `json:"status"`
 	Timezone            string          `json:"timezone"`
 	TimeoutSeconds      int             `json:"timeout_seconds"`
+	ConcurrencyPolicy   string          `json:"concurrency_policy"`
 	LastRunAt           *time.Time      `json:"last_run_at"`
 	CreatedAt           time.Time       `json:"created_at"`
 	UpdatedAt           time.Time       `json:"updated_at"`

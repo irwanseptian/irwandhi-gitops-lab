@@ -3,6 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import CronHelper from './CronHelper';
 
 const METHODS  = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+const CONCURRENCY_POLICIES = [
+  { value: 'Allow',   label: 'Allow',   desc: 'Allow concurrent runs — new run starts even if a previous one is still in-flight.' },
+  { value: 'Forbid',  label: 'Forbid',  desc: 'Skip new run if the previous one hasn\'t finished yet.' },
+  { value: 'Replace', label: 'Replace', desc: 'Cancel the in-flight run and immediately start a new one.' },
+];
 const PRESETS  = [
   { label: 'Every minute',      value: '* * * * *'    },
   { label: 'Every 5 min',       value: '*/5 * * * *'  },
@@ -15,14 +20,15 @@ const PRESETS  = [
 export default function JobForm({ initial = {}, onSubmit, isLoading, onCancel }) {
   const navigate = useNavigate();
   const [form, setForm] = useState({
-    name:            '',
-    description:     '',
-    cron_expression: '0 * * * *',
-    url:             '',
-    method:          'GET',
-    body:            '',
-    timezone:        'UTC',
-    timeout_seconds: 30,
+    name:               '',
+    description:        '',
+    cron_expression:    '0 * * * *',
+    url:                '',
+    method:             'GET',
+    body:               '',
+    timezone:           'UTC',
+    timeout_seconds:    30,
+    concurrency_policy: 'Allow',
     ...initial,
   });
 
@@ -118,6 +124,22 @@ export default function JobForm({ initial = {}, onSubmit, isLoading, onCancel })
             value={form.timeout_seconds}
             onChange={set('timeout_seconds')}
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Concurrency Policy</label>
+          <select
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-500"
+            value={form.concurrency_policy}
+            onChange={set('concurrency_policy')}
+          >
+            {CONCURRENCY_POLICIES.map(p => (
+              <option key={p.value} value={p.value}>{p.label}</option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-400 mt-1">
+            {CONCURRENCY_POLICIES.find(p => p.value === form.concurrency_policy)?.desc}
+          </p>
         </div>
 
         {['POST', 'PUT', 'PATCH'].includes(form.method) && (

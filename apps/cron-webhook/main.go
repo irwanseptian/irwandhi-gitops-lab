@@ -23,14 +23,20 @@ var dashboardHTML []byte
 const maxEntries = 100
 
 type Entry struct {
-	ID           string            `json:"id"`
-	Method       string            `json:"method"`
-	Path         string            `json:"path"`
-	Query        map[string]string `json:"query"`
-	Headers      map[string]string `json:"headers"`
-	Body         string            `json:"body"`
-	Timestamp    time.Time         `json:"timestamp"`
-	RespondedWith int              `json:"respondedWith"`
+	ID            string            `json:"id"`
+	Method        string            `json:"method"`
+	Path          string            `json:"path"`
+	Query         map[string]string `json:"query"`
+	Headers       map[string]string `json:"headers"`
+	Body          string            `json:"body"`
+	Timestamp     time.Time         `json:"timestamp"`
+	RespondedWith int               `json:"respondedWith"`
+}
+
+type SlowEntry struct {
+	ID        string    `json:"id"`
+	DelaySec  int       `json:"delay_sec"`
+	StartedAt time.Time `json:"started_at"`
 }
 
 type store struct {
@@ -59,6 +65,37 @@ func (s *store) clear() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.entries = nil
+}
+
+type slowStore struct {
+	mu      sync.RWMutex
+	entries map[string]SlowEntry
+}
+
+func newSlowStore() *slowStore {
+	return &slowStore{entries: make(map[string]SlowEntry)}
+}
+
+func (ss *slowStore) add(e SlowEntry) {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
+	ss.entries[e.ID] = e
+}
+
+func (ss *slowStore) remove(id string) {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
+	delete(ss.entries, id)
+}
+
+func (ss *slowStore) getAll() []SlowEntry {
+	ss.mu.RLock()
+	defer ss.mu.RUnlock()
+	out := make([]SlowEntry, 0, len(ss.entries))
+	for _, e := range ss.entries {
+		out = append(out, e)
+	}
+	return out
 }
 
 type broker struct {
@@ -108,8 +145,9 @@ func main() {
 		port = "4000"
 	}
 
-	s := &store{}
-	b := newBroker()
+	s  := &store{}
+	ss := newSlowStore()
+	b  := newBroker()
 
 	mux := http.NewServeMux()
 
@@ -135,13 +173,20 @@ func main() {
 		w.Header().Set("Connection", "keep-alive")
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 
-		// Send current history as init event.
+		// Send current history + active slow jobs as init event.
 		entries := s.getAll()
 		if entries == nil {
 			entries = []Entry{}
 		}
-		initData, _ := json.Marshal(entries)
-		fmt.Fprintf(w, "data: {\"type\":\"init\",\"data\":%s}\n\n", initData)
+		activeSlows := ss.getAll()
+		if activeSlows == nil {
+			activeSlows = []SlowEntry{}
+		}
+		initPayload, _ := json.Marshal(map[string]any{
+			"requests":     entries,
+			"active_slows": activeSlows,
+		})
+		fmt.Fprintf(w, "data: {\"type\":\"init\",\"data\":%s}\n\n", initPayload)
 		flusher.Flush()
 
 		ch := b.subscribe()
@@ -172,6 +217,56 @@ func main() {
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
+	})
+
+	// /slow?delay=N — simulates a long-running job (1–120 s, default 5 s).
+	mux.HandleFunc("/slow", func(w http.ResponseWriter, r *http.Request) {
+		delay := 5
+		if d := r.URL.Query().Get("delay"); d != "" {
+			if n, err := strconv.Atoi(d); err == nil && n >= 1 && n <= 120 {
+				delay = n
+			}
+		}
+
+		entry := SlowEntry{
+			ID:        newID(),
+			DelaySec:  delay,
+			StartedAt: time.Now().UTC(),
+		}
+
+		ss.add(entry)
+		startData, _ := json.Marshal(entry)
+		b.broadcast("slow_start", string(startData))
+		log.Printf("SLOW %s started (delay=%ds)", entry.ID, delay)
+
+		startedAt := time.Now()
+		select {
+		case <-time.After(time.Duration(delay) * time.Second):
+		case <-r.Context().Done():
+		}
+
+		durationMs := int(time.Since(startedAt).Milliseconds())
+		cancelled := r.Context().Err() != nil
+
+		ss.remove(entry.ID)
+		endData, _ := json.Marshal(map[string]any{
+			"id":          entry.ID,
+			"duration_ms": durationMs,
+			"cancelled":   cancelled,
+		})
+		b.broadcast("slow_end", string(endData))
+		log.Printf("SLOW %s finished in %dms (cancelled=%v)", entry.ID, durationMs, cancelled)
+
+		if cancelled {
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"ok":          true,
+			"id":          entry.ID,
+			"delay_sec":   delay,
+			"duration_ms": durationMs,
+		})
 	})
 
 	// Catch-all: capture every request.

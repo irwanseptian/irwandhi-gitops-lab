@@ -13,6 +13,7 @@ import (
 const jobsQuery = `
 	SELECT j.id::text, j.user_id::text, j.name, COALESCE(j.description,''), j.cron_expression,
 	       j.url, j.method, j.headers, j.body, j.status, j.timezone, j.timeout_seconds,
+	       j.concurrency_policy,
 	       j.last_run_at, j.created_at, j.updated_at,
 	       (SELECT COUNT(*) FROM executions e WHERE e.job_id = j.id)::int,
 	       (SELECT status FROM executions e WHERE e.job_id = j.id ORDER BY started_at DESC LIMIT 1)
@@ -26,6 +27,7 @@ func scanJob(row interface {
 	err := row.Scan(
 		&j.ID, &j.UserID, &j.Name, &j.Description, &j.CronExpression,
 		&j.URL, &j.Method, &rawHeaders, &j.Body, &j.Status, &j.Timezone, &j.TimeoutSeconds,
+		&j.ConcurrencyPolicy,
 		&j.LastRunAt, &j.CreatedAt, &j.UpdatedAt,
 		&j.ExecutionCount, &j.LastExecutionStatus,
 	)
@@ -82,10 +84,10 @@ func (h *Handler) CreateJob(w http.ResponseWriter, r *http.Request) {
 
 	var id string
 	err := h.db.QueryRow(context.Background(),
-		`INSERT INTO jobs (user_id,name,description,cron_expression,url,method,headers,body,timezone,timeout_seconds)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id::text`,
+		`INSERT INTO jobs (user_id,name,description,cron_expression,url,method,headers,body,timezone,timeout_seconds,concurrency_policy)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id::text`,
 		uid, b.Name, b.Description, b.CronExpression, b.URL, b.Method,
-		b.headersJSON(), b.Body, b.Timezone, b.TimeoutSeconds,
+		b.headersJSON(), b.Body, b.Timezone, b.TimeoutSeconds, b.ConcurrencyPolicy,
 	).Scan(&id)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -107,10 +109,10 @@ func (h *Handler) UpdateJob(w http.ResponseWriter, r *http.Request) {
 	var id string
 	err := h.db.QueryRow(context.Background(),
 		`UPDATE jobs SET name=$1,description=$2,cron_expression=$3,url=$4,method=$5,
-		 headers=$6,body=$7,timezone=$8,timeout_seconds=$9,updated_at=NOW()
-		 WHERE id=$10::uuid AND user_id=$11::uuid RETURNING id::text`,
+		 headers=$6,body=$7,timezone=$8,timeout_seconds=$9,concurrency_policy=$10,updated_at=NOW()
+		 WHERE id=$11::uuid AND user_id=$12::uuid RETURNING id::text`,
 		b.Name, b.Description, b.CronExpression, b.URL, b.Method,
-		b.headersJSON(), b.Body, b.Timezone, b.TimeoutSeconds,
+		b.headersJSON(), b.Body, b.Timezone, b.TimeoutSeconds, b.ConcurrencyPolicy,
 		chi.URLParam(r, "id"), uid,
 	).Scan(&id)
 	if err != nil {
@@ -166,6 +168,17 @@ func (h *Handler) TriggerJob(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "Job not found")
 		return
 	}
+	switch j.ConcurrencyPolicy {
+	case "Forbid":
+		if executor.HasRunning(r.Context(), h.db, j.ID) {
+			writeError(w, http.StatusConflict, "Job is already running (Forbid policy)")
+			return
+		}
+	case "Replace":
+		h.db.Exec(context.Background(),
+			`UPDATE executions SET cancel_requested=TRUE WHERE job_id=$1::uuid AND status='running'`,
+			j.ID)
+	}
 	executor.Run(h.db, toExecJob(j), "manual")
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Job triggered"})
 }
@@ -173,15 +186,16 @@ func (h *Handler) TriggerJob(w http.ResponseWriter, r *http.Request) {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 type jobInput struct {
-	Name           string          `json:"name"`
-	Description    string          `json:"description"`
-	CronExpression string          `json:"cron_expression"`
-	URL            string          `json:"url"`
-	Method         string          `json:"method"`
-	Headers        json.RawMessage `json:"headers"`
-	Body           *string         `json:"body"`
-	Timezone       string          `json:"timezone"`
-	TimeoutSeconds int             `json:"timeout_seconds"`
+	Name              string          `json:"name"`
+	Description       string          `json:"description"`
+	CronExpression    string          `json:"cron_expression"`
+	URL               string          `json:"url"`
+	Method            string          `json:"method"`
+	Headers           json.RawMessage `json:"headers"`
+	Body              *string         `json:"body"`
+	Timezone          string          `json:"timezone"`
+	TimeoutSeconds    int             `json:"timeout_seconds"`
+	ConcurrencyPolicy string          `json:"concurrency_policy"`
 }
 
 func (b *jobInput) applyDefaults() {
@@ -194,6 +208,9 @@ func (b *jobInput) applyDefaults() {
 	if b.TimeoutSeconds == 0 {
 		b.TimeoutSeconds = 30
 	}
+	if b.ConcurrencyPolicy == "" {
+		b.ConcurrencyPolicy = "Allow"
+	}
 }
 
 func (b *jobInput) headersJSON() string {
@@ -205,12 +222,13 @@ func (b *jobInput) headersJSON() string {
 
 func toExecJob(j Job) executor.Job {
 	return executor.Job{
-		ID:             j.ID,
-		Name:           j.Name,
-		URL:            j.URL,
-		Method:         j.Method,
-		Headers:        j.Headers,
-		Body:           j.Body,
-		TimeoutSeconds: j.TimeoutSeconds,
+		ID:                j.ID,
+		Name:              j.Name,
+		URL:               j.URL,
+		Method:            j.Method,
+		Headers:           j.Headers,
+		Body:              j.Body,
+		TimeoutSeconds:    j.TimeoutSeconds,
+		ConcurrencyPolicy: j.ConcurrencyPolicy,
 	}
 }

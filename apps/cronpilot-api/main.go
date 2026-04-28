@@ -78,6 +78,7 @@ func main() {
 			r.Get("/report/executions.csv", h.ReportCSV)
 
 			r.Get("/executions", h.ListExecutions)
+			r.Get("/executions/running", h.ListRunningExecutions)
 			r.Get("/executions/{id}", h.GetExecution)
 
 			r.Group(func(r chi.Router) {
