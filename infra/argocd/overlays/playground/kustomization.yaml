@@ -1,0 +1,32 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: argocd
+
+resources:
+- ../../base
+- https://raw.githubusercontent.com/argoproj/argo-cd/master/manifests/ha/install.yaml
+- argo-cd-ui-ingress.yaml
+
+components:
+- https://github.com/argoproj-labs/argocd-extensions/manifests
+
+patches:
+- path: argo-cd-cm.yaml
+- path: argocd-cmd-params-cm.yaml
+- path: argocd-notifications-cm.yaml
+- path: argocd-notifications-controller-deploy.yaml
+- path: argocd-rbac-cm.yaml
+- path: argocd-server-service.yaml
+- path: https://raw.githubusercontent.com/argoproj/argo-cd/master/notifications_catalog/install.yaml
+- path: patch-priority-class.yaml
+  target:
+    kind: Deployment
+- path: patch-priority-class.yaml
+  target:
+    kind: StatefulSet
+
+images:
+- name: quay.io/argoproj/argocd
+  newName: ghcr.io/argoproj/argo-cd/argocd
+  newTag: 3.5.0-5083a218

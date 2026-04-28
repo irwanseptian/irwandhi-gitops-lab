@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cronpilot-api
+  namespace: argocd
+spec:
+  project: cronpilot
+  source:
+    repoURL: https://github.com/irwanseptian/irwandhi-gitops-lab.git
+    targetRevision: HEAD
+    path: kubernetes/overlays/playground/cronpilot-api
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cronpilot-api
+  syncPolicy: {}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd
+  namespace: argocd
+spec:
+  project: infra
+  source:
+    repoURL: https://github.com/irwanseptian/irwandhi-gitops-lab.git
+    targetRevision: HEAD
+    path: infra/argocd/overlays/playground
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy: {}
