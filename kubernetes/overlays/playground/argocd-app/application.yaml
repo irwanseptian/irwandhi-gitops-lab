@@ -17,6 +17,54 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
+  name: cronpilot-frontend
+  namespace: argocd
+spec:
+  project: cronpilot
+  source:
+    repoURL: https://github.com/irwanseptian/irwandhi-gitops-lab.git
+    targetRevision: HEAD
+    path: kubernetes/overlays/playground/cronpilot-frontend
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cronpilot-frontend
+  syncPolicy: {}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cronpilot-worker
+  namespace: argocd
+spec:
+  project: cronpilot
+  source:
+    repoURL: https://github.com/irwanseptian/irwandhi-gitops-lab.git
+    targetRevision: HEAD
+    path: kubernetes/overlays/playground/cronpilot-worker
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cronpilot-worker
+  syncPolicy: {}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cron-webhook
+  namespace: argocd
+spec:
+  project: cronpilot
+  source:
+    repoURL: https://github.com/irwanseptian/irwandhi-gitops-lab.git
+    targetRevision: HEAD
+    path: kubernetes/overlays/playground/cron-webhook
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cron-webhook
+  syncPolicy: {}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
   name: argocd
   namespace: argocd
 spec:
