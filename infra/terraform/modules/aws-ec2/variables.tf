@@ -25,6 +25,12 @@ variable "instance_type" {
   default     = "t3.micro"
 }
 
+variable "instance_name" {
+  description = "Name for the EC2 instance"
+  type        = string
+  default     = "ec2"
+}
+
 variable "tags" {
   type    = map(string)
   default = {}
