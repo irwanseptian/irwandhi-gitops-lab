@@ -18,6 +18,12 @@ variable "key_name" {
   type        = string
 }
 
+variable "instance_name" {
+  description = "Name for the EC2 instance"
+  type        = string
+  default     = "ec2"
+}
+
 variable "aws_region" {
   description = "AWS region to deploy resources into"
   type        = string

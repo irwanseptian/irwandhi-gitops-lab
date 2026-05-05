@@ -1,5 +1,5 @@
 name              = "dev"
-subnet_id         = "subnet-068bdcc4eb63d329a"
+subnet_id         = "subnet-07a0e499856d4bb39"
 security_group_id = "sg-093bd0e8c0955881b"
 key_name          = "cronpilot"
 instance_name     = "cronpilot-vm"
