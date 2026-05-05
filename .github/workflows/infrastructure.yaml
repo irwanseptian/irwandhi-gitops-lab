@@ -6,11 +6,13 @@ on:
       - main
     paths:
       - "infra/terraform/environments/**"
+      - "infra/terraform/stacks/**"
   pull_request:
     branches:
       - main
     paths:
       - "infra/terraform/environments/**"
+      - "infra/terraform/stacks/**"
 
 permissions:
   contents: read
@@ -29,14 +31,18 @@ jobs:
       - name: Find all terraform stacks
         id: scan
         run: |
-          stacks=$(find infra/terraform/environments -mindepth 1 -name "*.tf" \
-            ! -path "*/.terraform/*" \
-            | xargs -I{} dirname {} \
-            | sort -u \
-            | while IFS= read -r path; do
-                env=$(echo "$path" | cut -d'/' -f3)
-                jq -cn --arg stack "$path" --arg env "$env" \
-                  '{"stack": $stack, "environment": $env}'
+          stacks=$(find infra/terraform/environments -mindepth 3 -maxdepth 3 -name "terraform.tfvars" \
+            | while IFS= read -r tfvars; do
+                env_path=$(dirname "$tfvars")
+                stack_name=$(basename "$env_path")
+                env=$(basename "$(dirname "$env_path")")
+                stack_path="infra/terraform/stacks/${stack_name}"
+                jq -cn \
+                  --arg stack "$stack_name" \
+                  --arg environment "$env" \
+                  --arg stack_path "$stack_path" \
+                  --arg env_path "$env_path" \
+                  '{"stack": $stack, "environment": $environment, "stack_path": $stack_path, "env_path": $env_path}'
               done \
             | jq -sc '.')
           echo "stacks=${stacks}" >> $GITHUB_OUTPUT
@@ -58,7 +64,6 @@ jobs:
         id: filter
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            # Only look at what changed in the latest commit, not the full PR branch
             BASE="HEAD~1"
             HEAD="HEAD"
           else
@@ -80,8 +85,11 @@ jobs:
           changed='[]'
           for row in $(echo '${{ needs.discover.outputs.stacks }}' | jq -c '.[]'); do
             stack=$(echo "$row" | jq -r '.stack')
+            env_path=$(echo "$row" | jq -r '.env_path')
+            stack_path=$(echo "$row" | jq -r '.stack_path')
 
-            if echo "$CHANGED_FILES" | grep -q "^${stack}/"; then
+            if echo "$CHANGED_FILES" | grep -q "^${env_path}/" || \
+               echo "$CHANGED_FILES" | grep -q "^${stack_path}/"; then
               changed=$(echo "$changed" | jq -c --argjson item "$row" '. + [$item]')
             fi
           done
@@ -90,7 +98,7 @@ jobs:
           echo "stacks=${changed}" >> $GITHUB_OUTPUT
 
   terraform:
-    name: Terraform (${{ matrix.stack }})
+    name: Terraform (${{ matrix.environment }}/${{ matrix.stack }})
     runs-on: ubuntu-24.04
     needs: detect-changes
     if: needs.detect-changes.outputs.stacks != '[]' && needs.detect-changes.outputs.stacks != ''
@@ -103,10 +111,12 @@ jobs:
 
     defaults:
       run:
-        working-directory: ${{ matrix.stack }}
+        working-directory: ${{ matrix.stack_path }}
 
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      TF_VAR_FILE: ${{ github.workspace }}/${{ matrix.env_path }}/terraform.tfvars
+      TF_BACKEND_CONFIG: ${{ github.workspace }}/${{ matrix.env_path }}/backend.hcl
 
     steps:
       - uses: actions/checkout@v4
@@ -127,7 +137,7 @@ jobs:
         run: terraform fmt -check -recursive
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -backend-config="${TF_BACKEND_CONFIG}"
 
       - name: Terraform Validate
         run: terraform validate
@@ -135,7 +145,7 @@ jobs:
       - name: Terraform Plan
         id: plan
         run: |
-          terraform plan -no-color -out=tfplan -input=false 2>&1 | tee plan_output.txt
+          terraform plan -no-color -out=tfplan -input=false -var-file="${TF_VAR_FILE}" 2>&1 | tee plan_output.txt
           echo "stdout<<EOF" >> $GITHUB_OUTPUT
           cat plan_output.txt >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -145,7 +155,7 @@ jobs:
         uses: actions/github-script@v7
         env:
           PLAN_OUTPUT: ${{ steps.plan.outputs.stdout }}
-          STACK: ${{ matrix.stack }}
+          STACK: ${{ matrix.environment }}/${{ matrix.stack }}
         with:
           script: |
             const output = process.env.PLAN_OUTPUT;
