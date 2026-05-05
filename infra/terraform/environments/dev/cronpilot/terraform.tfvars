@@ -1,5 +1,5 @@
 name              = "dev"
 subnet_id         = "subnet-068bdcc4eb63d329a"
-security_group_id = "sg-09a8f574eaa2db121"
+security_group_id = "sg-093bd0e8c0955881b"
 key_name          = "cronpilot"
 aws_region        = "ap-southeast-1"
