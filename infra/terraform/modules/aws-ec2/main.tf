@@ -38,8 +38,12 @@ resource "aws_iam_role_policy_attachment" "ssm" {
 }
 
 resource "aws_iam_instance_profile" "ec2" {
-  name = "${var.name}-ec2"
+  name = "${var.name}-${var.instance_name}"
   role = aws_iam_role.ec2.name
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_instance" "ec2" {
@@ -78,7 +82,7 @@ resource "aws_instance" "ec2" {
   })
 
   lifecycle {
-    ignore_changes = [ami]
+    ignore_changes = [ami, user_data, associate_public_ip_address]
   }
 }
 

@@ -5,4 +5,5 @@ module "aws-ec2-cronpilot" {
   subnet_id         = var.subnet_id
   security_group_id = var.security_group_id
   key_name          = var.key_name
+  instance_name     = var.instance_name
 }
