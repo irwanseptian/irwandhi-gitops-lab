@@ -74,7 +74,7 @@ resource "aws_instance" "ec2" {
   }
 
   tags = merge(local.tags, {
-    Name = "${var.name}-ec2"
+    Name = "${var.name}-${var.instance_name}"
   })
 
   lifecycle {
