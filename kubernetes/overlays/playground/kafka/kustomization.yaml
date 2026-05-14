@@ -12,11 +12,11 @@ helmCharts:
     valuesInline:
       # KRaft mode — no ZooKeeper, single broker for local k3d
       replicaCount: 1
-      
+
       image:
-        registry: docker.io
-        repository: bitnami/kafka
-        tag: 4.0.0-debian-12-r10
+        registry: dhi.io
+        repository: kafka
+        tag: 4-debian13-native
 
       kraft:
         enabled: true
