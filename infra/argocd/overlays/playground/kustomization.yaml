@@ -18,6 +18,8 @@ patches:
 - path: argocd-notifications-controller-deploy.yaml
 - path: argocd-rbac-cm.yaml
 - path: argocd-server-service.yaml
+- path: application.yaml
+- path: project.yaml
 - path: https://raw.githubusercontent.com/argoproj/argo-cd/master/notifications_catalog/install.yaml
 - path: patch-priority-class.yaml
   target:

@@ -1,0 +1,167 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cronpilot-api
+  namespace: argocd
+spec:
+  project: cronpilot
+  source:
+    repoURL: https://github.com/irwanseptian/irwandhi-gitops-lab.git
+    targetRevision: HEAD
+    path: kubernetes/overlays/playground/cronpilot-api
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cronpilot-api
+  syncPolicy: {}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cronpilot-frontend
+  namespace: argocd
+spec:
+  project: cronpilot
+  source:
+    repoURL: https://github.com/irwanseptian/irwandhi-gitops-lab.git
+    targetRevision: HEAD
+    path: kubernetes/overlays/playground/cronpilot-frontend
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cronpilot-frontend
+  syncPolicy: {}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cronpilot-worker
+  namespace: argocd
+spec:
+  project: cronpilot
+  source:
+    repoURL: https://github.com/irwanseptian/irwandhi-gitops-lab.git
+    targetRevision: HEAD
+    path: kubernetes/overlays/playground/cronpilot-worker
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cronpilot-worker
+  syncPolicy: {}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cron-webhook
+  namespace: argocd
+spec:
+  project: cronpilot
+  source:
+    repoURL: https://github.com/irwanseptian/irwandhi-gitops-lab.git
+    targetRevision: HEAD
+    path: kubernetes/overlays/playground/cron-webhook
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cron-webhook
+  syncPolicy: {}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd
+  namespace: argocd
+spec:
+  project: infra
+  source:
+    repoURL: https://github.com/irwanseptian/irwandhi-gitops-lab.git
+    targetRevision: HEAD
+    path: infra/argocd/overlays/playground
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: keda
+  namespace: keda
+spec:
+  project: infra
+  source:
+    repoURL: https://github.com/irwanseptian/irwandhi-gitops-lab.git
+    targetRevision: HEAD
+    path: kubernetes/overlays/playground/keda
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: keda
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kafka
+  namespace: kafka
+spec:
+  project: infra
+  source:
+    repoURL: https://github.com/irwanseptian/irwandhi-gitops-lab.git
+    targetRevision: HEAD
+    path: kubernetes/overlays/playground/kafka
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kafka
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kafka-producer
+  namespace: kafka-producer
+spec:
+  project: infra
+  source:
+    repoURL: https://github.com/irwanseptian/irwandhi-gitops-lab.git
+    targetRevision: HEAD
+    path: kubernetes/overlays/playground/kafka-producer
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kafka-demo
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kafka-consumer
+  namespace: kafka-consumer
+spec:
+  project: infra
+  source:
+    repoURL: https://github.com/irwanseptian/irwandhi-gitops-lab.git
+    targetRevision: HEAD
+    path: kubernetes/overlays/playground/kafka-consumer
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kafka-demo
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
