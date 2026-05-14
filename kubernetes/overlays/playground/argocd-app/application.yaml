@@ -79,3 +79,89 @@ spec:
   syncPolicy:
     syncOptions:
       - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: keda
+  namespace: argocd
+spec:
+  project: infra
+  source:
+    repoURL: https://github.com/irwanseptian/irwandhi-gitops-lab.git
+    targetRevision: HEAD
+    path: kubernetes/overlays/playground/keda
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: keda
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kafka
+  namespace: argocd
+spec:
+  project: infra
+  source:
+    repoURL: https://github.com/irwanseptian/irwandhi-gitops-lab.git
+    targetRevision: HEAD
+    path: kubernetes/overlays/playground/kafka
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kafka
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kafka-producer
+  namespace: argocd
+spec:
+  project: cronpilot
+  source:
+    repoURL: https://github.com/irwanseptian/irwandhi-gitops-lab.git
+    targetRevision: HEAD
+    path: kubernetes/overlays/playground/kafka-producer
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kafka-demo
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kafka-consumer
+  namespace: argocd
+spec:
+  project: cronpilot
+  source:
+    repoURL: https://github.com/irwanseptian/irwandhi-gitops-lab.git
+    targetRevision: HEAD
+    path: kubernetes/overlays/playground/kafka-consumer
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kafka-demo
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

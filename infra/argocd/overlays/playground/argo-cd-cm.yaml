@@ -4,3 +4,5 @@ metadata:
   name: argocd-cm
 data:
   url: http://argocd.localhost
+  # Allow Kustomize overlays to reference Helm charts via the helmCharts field.
+  kustomize.buildOptions: "--enable-helm"
