@@ -130,7 +130,7 @@ metadata:
   name: kafka-producer
   namespace: kafka-producer
 spec:
-  project: cronpilot
+  project: infra
   source:
     repoURL: https://github.com/irwanseptian/irwandhi-gitops-lab.git
     targetRevision: HEAD
@@ -151,7 +151,7 @@ metadata:
   name: kafka-consumer
   namespace: kafka-consumer
 spec:
-  project: cronpilot
+  project: infra
   source:
     repoURL: https://github.com/irwanseptian/irwandhi-gitops-lab.git
     targetRevision: HEAD
