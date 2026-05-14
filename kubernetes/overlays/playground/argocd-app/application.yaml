@@ -84,7 +84,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: keda
-  namespace: argocd
+  namespace: keda
 spec:
   project: infra
   source:
@@ -106,7 +106,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: kafka
-  namespace: argocd
+  namespace: kafka
 spec:
   project: infra
   source:
@@ -128,7 +128,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: kafka-producer
-  namespace: argocd
+  namespace: kafka-producer
 spec:
   project: cronpilot
   source:
@@ -149,7 +149,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: kafka-consumer
-  namespace: argocd
+  namespace: kafka-consumer
 spec:
   project: cronpilot
   source:
