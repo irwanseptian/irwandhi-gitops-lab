@@ -94,13 +94,7 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: keda
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
-      - ServerSideApply=true
+  syncPolicy: {}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -116,13 +110,7 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: kafka
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
-      - ServerSideApply=true
+  syncPolicy: {}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -138,12 +126,7 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: kafka-producer
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
+  syncPolicy: {}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -159,9 +142,4 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: kafka-consumer
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
+  syncPolicy: {}
