@@ -1,0 +1,27 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: kafka-consumer
+spec:
+  scaleTargetRef:
+    name: kafka-consumer
+  # Allow up to 6 pods — one per Kafka partition.
+  # More replicas than partitions won't help because idle pods won't
+  # receive any messages from Sarama's round-robin assignment.
+  minReplicaCount: 1
+  maxReplicaCount: 6
+  # How long (seconds) all metrics must be at minimum before scaling in.
+  cooldownPeriod: 60
+  # How often KEDA polls the Kafka lag metric (seconds).
+  pollingInterval: 15
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: kafka.kafka.svc.cluster.local:9092
+        consumerGroup: order-processor
+        topic: orders
+        # Scale up by one replica for every 100 unprocessed messages.
+        lagThreshold: "100"
+        # Don't scale to zero — keep at least one pod alive so lag
+        # is visible and the consumer group stays registered.
+        offsetResetPolicy: latest
