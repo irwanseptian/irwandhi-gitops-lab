@@ -165,3 +165,24 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kafka-ui
+  namespace: argocd
+spec:
+  project: infra
+  source:
+    repoURL: https://github.com/irwanseptian/irwandhi-gitops-lab.git
+    targetRevision: HEAD
+    path: kubernetes/overlays/playground/kafka-ui
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kafka-ui
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

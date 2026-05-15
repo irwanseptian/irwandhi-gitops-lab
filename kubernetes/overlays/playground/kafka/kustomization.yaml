@@ -4,19 +4,23 @@ kind: Kustomization
 namespace: kafka
 
 helmCharts:
+  # v30.1.8 is the last confirmed version in the HTTP repo index.
+  # v32.x was published after Bitnami migrated to OCI-only and is not
+  # reachable via --repo, which is what kustomize uses under the hood.
   - name: kafka
     repo: https://charts.bitnami.com/bitnami
-    version: "32.4.3"
+    version: "30.1.8"
     releaseName: kafka
     namespace: kafka
     valuesInline:
-      # KRaft mode — no ZooKeeper, single broker for local k3d
-      replicaCount: 1
+      replicaCount: 3
 
+      # bitnamilegacy mirrors the Bitnami image layout so the chart scripts
+      # work unchanged; it just lives on a different Docker Hub org.
       image:
-        registry: dhi.io
-        repository: kafka
-        tag: 4-debian13-native
+        registry: docker.io
+        repository: bitnamilegacy/kafka
+        tag: 4.0.0-debian-12-r10
 
       kraft:
         enabled: true
@@ -29,6 +33,12 @@ helmCharts:
         interbroker:
           protocol: PLAINTEXT
 
+      replicationFactor: 3
+      offsetsTopicReplicationFactor: 3
+      transactionStateLogReplicationFactor: 3
+      transactionStateLogMinIsr: 2
+      minInsyncReplicas: 2
+
       persistence:
         size: 2Gi
 
@@ -40,14 +50,5 @@ helmCharts:
           cpu: "1"
           memory: 1Gi
 
-      # Pre-create the orders topic with 6 partitions so KEDA can
-      # distribute load across up to 6 consumer pods.
       provisioning:
-        enabled: true
-        topics:
-          - name: orders
-            partitions: 6
-            replicationFactor: 1
-            config:
-              retention.ms: "3600000"
-              segment.ms: "300000"
+        enabled: false

@@ -1,0 +1,36 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: kafka-ui
+
+helmCharts:
+  - name: kafka-ui
+    repo: https://provectus.github.io/kafka-ui-charts
+    version: "0.7.6"
+    releaseName: kafka-ui
+    namespace: kafka-ui
+    valuesInline:
+      yamlApplicationConfig:
+        kafka:
+          clusters:
+            - name: playground
+              bootstrapServers: kafka.kafka.svc.cluster.local:9092
+
+      service:
+        type: ClusterIP
+        port: 8080
+
+      ingress:
+        enabled: true
+        ingressClassName: traefik
+        host: kafka-ui.localhost
+        path: /
+        pathType: Prefix
+
+      resources:
+        requests:
+          cpu: 50m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
