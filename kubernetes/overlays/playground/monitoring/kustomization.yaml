@@ -4,7 +4,7 @@ kind: Kustomization
 namespace: monitoring
 
 resources:
-  - crds.yaml
+  # - crds.yaml
   - namespace.yaml
 
 helmCharts:
@@ -14,6 +14,8 @@ helmCharts:
     releaseName: kube-prometheus-stack
     namespace: monitoring
     valuesInline:
+      crds:
+        enabled: true
       grafana:
         ingress:
           enabled: true
