@@ -49,6 +49,8 @@ spec:
     namespace: kafka-producer
   - server: https://kubernetes.default.svc
     namespace: kafka-consumer
+  - server: https://kubernetes.default.svc
+    namespace: monitoring
   clusterResourceWhitelist:
   - group: '*'
     kind: '*'
