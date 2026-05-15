@@ -5,6 +5,7 @@ namespace: monitoring
 
 resources:
   - crds.yaml
+  - namespace.yaml
 
 helmCharts:
   - name: kube-prometheus-stack
