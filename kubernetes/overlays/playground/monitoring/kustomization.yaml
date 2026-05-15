@@ -17,6 +17,8 @@ helmCharts:
       crds:
         enabled: true
       grafana:
+        testFramework:
+          enabled: false
         ingress:
           enabled: true
           ingressClassName: traefik
@@ -77,6 +79,16 @@ helmCharts:
 
       alertmanager:
         enabled: false
+
+      # Helm hooks (admission-create / admission-patch jobs) don't run in
+      # ArgoCD/kustomize — they land as plain resources applied out of order,
+      # leaving the ValidatingWebhookConfiguration with no valid CA cert and
+      # blocking all operator reconciliation. Disable entirely for GitOps.
+      prometheusOperator:
+        admissionWebhooks:
+          enabled: false
+        tls:
+          enabled: false
   - name: prometheus-kafka-exporter
     repo: https://prometheus-community.github.io/helm-charts
     version: "2.10.0"
