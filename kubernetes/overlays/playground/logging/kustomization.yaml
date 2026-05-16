@@ -52,11 +52,11 @@ helmCharts:
           cpu: 1000m
           memory: 2Gi
 
-      volumeClaimTemplate:
-        accessModes: ["ReadWriteOnce"]
-        resources:
-          requests:
-            storage: 5Gi
+      sysctlInitContainer:
+        enabled: true
+
+      persistence:
+        enabled: false
 
       # Single-node cluster: disable zen discovery quorum requirements
       clusterHealthCheckParams: "wait_for_status=yellow&timeout=1s"
