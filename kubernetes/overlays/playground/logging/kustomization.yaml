@@ -124,10 +124,27 @@ helmCharts:
 
           output {
             elasticsearch {
-              hosts => ["http://elasticsearch-master:9200"]
-              index => "k8s-logs-%{+YYYY.MM.dd}"
+              hosts            => ["https://elasticsearch-master:9200"]
+              user             => "${ELASTIC_USERNAME}"
+              password         => "${ELASTIC_PASSWORD}"
+              ssl_enabled      => true
+              ssl_verification_mode => "none"
+              index            => "k8s-logs-%{+YYYY.MM.dd}"
             }
           }
+
+      # Inject credentials from the secret created by the ES chart
+      extraEnvs:
+        - name: ELASTIC_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: elasticsearch-master-credentials
+              key: username
+        - name: ELASTIC_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: elasticsearch-master-credentials
+              key: password
 
       # Expose port 8080 for Fluent Bit HTTP input
       service:
