@@ -94,6 +94,8 @@ helmCharts:
         logstash.yml: |
           http.host: 0.0.0.0
           xpack.monitoring.enabled: false
+          xpack.monitoring.elasticsearch.username: "${ELASTIC_USERNAME}"
+          xpack.monitoring.elasticsearch.password: "${ELASTIC_PASSWORD}"
 
       # Pipeline: receive from Fluent Bit → JSON-parse → Elasticsearch
       logstashPipeline:
