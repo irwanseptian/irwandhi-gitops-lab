@@ -276,7 +276,7 @@ helmCharts:
               Name             http
               Match            kube.*
               Host             logstash-logstash.logging.svc.cluster.local
-              Port             9600
+              Port             8080
               URI              /
               Format           json_lines
               Json_Date_Key    timestamp
