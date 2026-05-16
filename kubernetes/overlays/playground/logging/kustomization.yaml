@@ -22,6 +22,22 @@ patches:
       kind: Job
       metadata:
         name: post-delete-kibana-kibana
+  - target:
+      kind: Deployment
+      name: kibana-kibana
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: kibana-kibana
+      spec:
+        template:
+          spec:
+            containers:
+              - name: kibana
+                env:
+                  - $patch: delete
+                    name: ELASTICSEARCH_SERVICEACCOUNTTOKEN
 
 helmCharts:
 
@@ -124,12 +140,12 @@ helmCharts:
 
           output {
             elasticsearch {
-              hosts            => ["https://elasticsearch-master:9200"]
-              user             => "${ELASTIC_USERNAME}"
-              password         => "${ELASTIC_PASSWORD}"
-              ssl              => true
-              ssl_certificate_verification => "false"
-              index            => "k8s-logs-%{+YYYY.MM.dd}"
+              hosts                => ["https://elasticsearch-master:9200"]
+              user                 => "${ELASTIC_USERNAME}"
+              password             => "${ELASTIC_PASSWORD}"
+              ssl          => true
+              ssl_certificate_verification => false
+              index                => "k8s-logs-%{+YYYY.MM.dd}"
             }
           }
 
