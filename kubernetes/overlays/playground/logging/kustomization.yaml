@@ -1,0 +1,249 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: logging
+
+resources:
+  - namespace.yaml
+
+# Drop Kibana's Helm-hook Jobs — pre/post hooks don't run in ArgoCD/kustomize
+# and would be applied as stale resources. Use $patch: delete to excise them
+# from the rendered output before ArgoCD applies anything.
+patches:
+  - patch: |-
+      $patch: delete
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: pre-install-kibana-kibana
+  - patch: |-
+      $patch: delete
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: post-delete-kibana-kibana
+
+helmCharts:
+
+  # ── Elasticsearch ─────────────────────────────────────────────────────────
+  - name: elasticsearch
+    repo: https://helm.elastic.co
+    version: "8.5.1"
+    releaseName: elasticsearch
+    namespace: logging
+    valuesInline:
+      replicas: 1
+      minimumMasterNodes: 1
+
+      esConfig:
+        elasticsearch.yml: |
+          xpack.security.enabled: false
+          xpack.security.http.ssl.enabled: false
+          xpack.security.transport.ssl.enabled: false
+
+      # Heap at 50% of container memory limit
+      esJavaOpts: "-Xmx512m -Xms512m"
+
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+
+      volumeClaimTemplate:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
+
+      # Single-node cluster: disable zen discovery quorum requirements
+      clusterHealthCheckParams: "wait_for_status=yellow&timeout=1s"
+
+      # Disable the Helm test pod — not needed in GitOps
+      tests:
+        enabled: false
+
+  # ── Logstash ──────────────────────────────────────────────────────────────
+  - name: logstash
+    repo: https://helm.elastic.co
+    version: "8.5.1"
+    releaseName: logstash
+    namespace: logging
+    valuesInline:
+      replicas: 1
+
+      logstashConfig:
+        logstash.yml: |
+          http.host: 0.0.0.0
+          xpack.monitoring.enabled: false
+
+      # Pipeline: receive from Fluent Bit → JSON-parse → Elasticsearch
+      logstashPipeline:
+        logstash.conf: |
+          input {
+            http {
+              port  => 8080
+              codec => json_lines
+            }
+          }
+
+          filter {
+            # Enrich with Fluent Bit Kubernetes metadata if present
+            if [kubernetes] {
+              mutate {
+                add_field => {
+                  "namespace" => "%{[kubernetes][namespace_name]}"
+                  "pod"       => "%{[kubernetes][pod_name]}"
+                  "container" => "%{[kubernetes][container_name]}"
+                }
+              }
+            }
+
+            # Try to JSON-parse the raw log line; fall back silently on plain text
+            if [log] {
+              json {
+                source              => "log"
+                target              => "parsed"
+                skip_on_invalid_json => true
+              }
+            } else if [message] {
+              json {
+                source              => "message"
+                target              => "parsed"
+                skip_on_invalid_json => true
+              }
+            }
+
+            # Drop the internal _jsonparsefailure tag so plain-text logs still flow
+            mutate {
+              remove_tag => ["_jsonparsefailure"]
+            }
+          }
+
+          output {
+            elasticsearch {
+              hosts => ["http://elasticsearch-master:9200"]
+              index => "k8s-logs-%{+YYYY.MM.dd}"
+            }
+          }
+
+      # Expose port 8080 for Fluent Bit HTTP input
+      service:
+        type: ClusterIP
+        ports:
+          - name: http-input
+            port: 8080
+            protocol: TCP
+            targetPort: 8080
+          - name: monitoring
+            port: 9600
+            protocol: TCP
+            targetPort: 9600
+
+      resources:
+        requests:
+          cpu: 200m
+          memory: 512Mi
+        limits:
+          cpu: 1000m
+          memory: 1Gi
+
+      logstashJavaOpts: "-Xmx512m -Xms512m"
+
+  # ── Kibana ────────────────────────────────────────────────────────────────
+  - name: kibana
+    repo: https://helm.elastic.co
+    version: "8.5.1"
+    releaseName: kibana
+    namespace: logging
+    valuesInline:
+      elasticsearchHosts: "http://elasticsearch-master:9200"
+
+      kibanaConfig:
+        kibana.yml: |
+          xpack.security.enabled: false
+
+      ingress:
+        enabled: true
+        className: traefik
+        hosts:
+          - host: kibana.localhost
+            paths:
+              - path: /
+                pathType: Prefix
+
+      resources:
+        requests:
+          cpu: 200m
+          memory: 512Mi
+        limits:
+          cpu: 1000m
+          memory: 1Gi
+
+  # ── Fluent Bit ────────────────────────────────────────────────────────────
+  - name: fluent-bit
+    repo: https://fluent.github.io/helm-charts
+    version: "0.48.4"
+    releaseName: fluent-bit
+    namespace: logging
+    valuesInline:
+      config:
+        # Collect all container logs from every node
+        inputs: |
+          [INPUT]
+              Name              tail
+              Path              /var/log/containers/*.log
+              multiline.parser  docker, cri
+              Tag               kube.*
+              Refresh_Interval  5
+              Mem_Buf_Limit     5MB
+              Skip_Long_Lines   On
+
+        # Attach Kubernetes pod/namespace/container metadata to every record
+        filters: |
+          [FILTER]
+              Name                kubernetes
+              Match               kube.*
+              Kube_URL            https://kubernetes.default.svc:443
+              Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+              Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
+              Kube_Tag_Prefix     kube.var.log.containers.
+              Merge_Log           On
+              Keep_Log            Off
+              K8S-Logging.Parser  On
+              K8S-Logging.Exclude On
+
+        # Forward enriched records to Logstash HTTP input
+        outputs: |
+          [OUTPUT]
+              Name             http
+              Match            kube.*
+              Host             logstash.logging.svc.cluster.local
+              Port             8080
+              URI              /
+              Format           json_lines
+              Json_Date_Key    timestamp
+              Json_Date_Format iso8601
+
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 128Mi
+
+      # Disable the Helm test pod — not needed in GitOps
+      testFramework:
+        enabled: false
+
+      # Run on control-plane nodes too so no pod logs are missed
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule

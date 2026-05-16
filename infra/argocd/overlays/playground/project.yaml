@@ -51,6 +51,8 @@ spec:
     namespace: kafka-consumer
   - server: https://kubernetes.default.svc
     namespace: monitoring
+  - server: https://kubernetes.default.svc
+    namespace: logging
   clusterResourceWhitelist:
   - group: '*'
     kind: '*'
