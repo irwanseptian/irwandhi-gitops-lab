@@ -68,6 +68,9 @@ helmCharts:
           cpu: 1000m
           memory: 2Gi
 
+      persistence:
+        enabled: true
+
       volumeClaimTemplate:
         accessModes: ["ReadWriteOnce"]
         resources:
@@ -215,10 +218,8 @@ helmCharts:
 
       kibanaConfig:
         kibana.yml: |
-          xpack.security.enabled: false
           elasticsearch.username: "${ELASTICSEARCH_USERNAME}"
           elasticsearch.password: "${ELASTICSEARCH_PASSWORD}"
-          elasticsearch.ssl.verificationMode: none
 
       ingress:
         enabled: true
